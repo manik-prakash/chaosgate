@@ -1,0 +1,44 @@
+# ServiceAccount used by the ChaosEngines the orchestrator creates (CHAOS_SERVICE_ACCOUNT).
+# Namespaced: it can disturb pods in `default` only (the namespace of the demo app), not the whole cluster.
+# Node-level experiments (node-drain, node-cpu-hog, ...) would need a ClusterRole; they are not used here.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: litmus-admin
+  namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: litmus-admin
+  namespace: default
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "events", "configmaps", "secrets", "services", "pods/log", "pods/exec", "pods/eviction", "replicationcontrollers"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "deletecollection"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets", "replicasets", "daemonsets"]
+    verbs: ["list", "get", "patch", "update"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "list", "get", "delete", "deletecollection"]
+  - apiGroups: ["argoproj.io"]
+    resources: ["rollouts"]
+    verbs: ["list", "get", "patch", "update"]
+  - apiGroups: ["litmuschaos.io"]
+    resources: ["chaosengines", "chaosexperiments", "chaosresults"]
+    verbs: ["create", "delete", "get", "list", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: litmus-admin
+  namespace: default
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: litmus-admin
+subjects:
+  - kind: ServiceAccount
+    name: litmus-admin
+    namespace: default

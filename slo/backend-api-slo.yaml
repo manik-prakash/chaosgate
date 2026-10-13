@@ -1,0 +1,22 @@
+version: "prometheus/v1"
+service: "backend-api" # must match SLO_SERVICE_NAME
+labels:
+  owner: "devops-lab"
+slos:
+  - name: "requests-availability"
+    objective: 99.5
+    description: "99.5% of backend requests are non-5xx."
+    sli:
+      events:
+        error_query: sum(rate(http_requests_total{service="backend",code=~"5.."}[{{.window}}]))
+        total_query: sum(rate(http_requests_total{service="backend"}[{{.window}}]))
+    alerting:
+      name: BackendApiHighErrorRate
+      labels:
+        category: "availability"
+      annotations:
+        summary: "backend-api is burning its error budget too fast"
+      page_alert:
+        labels: {severity: page}
+      ticket_alert:
+        labels: {severity: ticket}

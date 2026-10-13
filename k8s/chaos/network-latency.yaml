@@ -1,0 +1,22 @@
+# Reference only: see pod-delete.yaml.
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: chaos-gate-pod-network-latency-example
+  namespace: default
+spec:
+  engineState: active
+  annotationCheck: "false"
+  appinfo:
+    appns: default
+    applabel: app=backend
+    appkind: rollout
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-network-latency
+      spec:
+        components:
+          env:
+            - {name: TOTAL_CHAOS_DURATION, value: "60"}
+            - {name: NETWORK_LATENCY, value: "1000"} # ms
+            - {name: NETWORK_INTERFACE, value: "eth0"}

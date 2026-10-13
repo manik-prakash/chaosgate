@@ -1,0 +1,107 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chaos-gate-config
+  namespace: default
+data:
+  NAMESPACE: "default"
+  CHAOS_GATE_STEP_INDEX: "1"
+  PROMETHEUS_URL: "http://prometheus-operated.monitoring:9090"
+  SLO_SERVICE_NAME: "backend-api"
+  ERROR_BUDGET_THRESHOLD: "0.02"
+  CHAOS_DURATION_SECONDS: "180"
+  POLL_INTERVAL_SECONDS: "10"
+  CHAOS_APP_LABEL: "app=backend"
+  CHAOS_APP_NAMESPACE: "default"
+  CHAOS_SERVICE_ACCOUNT: "litmus-admin"
+  CHAOS_RESULT_TIMEOUT_SECONDS: "300"
+  REPORT_DIR: "/reports"
+  GRAFANA_DASHBOARD_URL: "http://localhost:3000/d/chaos-gate"  # via: kubectl port-forward -n monitoring svc/kps-grafana 3000:80
+  MAX_CONCURRENT_GATES: "3"
+  HTTP_PORT: "8080"
+  DEMO_MODE: "true"
+  EXPERIMENT_DURATION_SECONDS: "30"
+  # pod-network-latency (the design doc default) needs the netem kernel module, which Docker Desktop/WSL2
+  # kernels lack; pod-http-latency injects the latency in a proxy instead.
+  EXPERIMENTS: "pod-delete,pod-cpu-hog-exec,pod-http-latency"
+  CHAOS_APP_PORT: "8080"
+  CHAOS_PROBE_URL: "http://backend.default.svc.cluster.local/healthz"  # availability must hold during chaos
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chaos-gate-orchestrator
+  namespace: default
+spec:
+  replicas: 1 # concurrency is handled by asyncio, not by pods
+  strategy:
+    type: Recreate # RWO volume: never run two pods at once
+  selector:
+    matchLabels:
+      app: chaos-gate-orchestrator
+  template:
+    metadata:
+      labels:
+        app: chaos-gate-orchestrator
+    spec:
+      serviceAccountName: chaos-gate-orchestrator
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: orchestrator
+          image: chaos-gate-orchestrator:latest
+          imagePullPolicy: IfNotPresent # minikube: `minikube image load`
+          ports:
+            - name: http
+              containerPort: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          # /healthz answers without touching the cluster: a Kubernetes outage must not restart this pod
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          envFrom:
+            - configMapRef:
+                name: chaos-gate-config
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi # no CPU limit: the event loop must not be throttled
+          volumeMounts:
+            - name: reports
+              mountPath: /reports
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: reports
+          persistentVolumeClaim:
+            claimName: chaos-gate-reports
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chaos-gate-dashboard
+  namespace: default
+spec:
+  selector:
+    app: chaos-gate-orchestrator
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http

@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Chaos gate report: {{ r.rollout }}</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 760px; margin: 2rem auto; padding: 0 1rem; color: #1f2933; }
+  .decision { padding: 1rem 1.25rem; border-radius: 6px; color: #fff; font-size: 1.5rem; font-weight: 600; }
+  .decision-promoted { background: #1b873f; }
+  .decision-aborted { background: #c62828; }
+  table { border-collapse: collapse; width: 100%; margin: .5rem 0 1.5rem; }
+  th, td { border: 1px solid #d0d7de; padding: .4rem .6rem; text-align: left; }
+  th { background: #f3f4f6; }
+  .pass { color: #1b873f; font-weight: 600; }
+  .fail { color: #c62828; font-weight: 600; }
+  .note { color: #6b7280; font-style: italic; }
+</style>
+</head>
+<body>
+<h1>Chaos gate report</h1>
+<p><strong>Rollout:</strong> {{ r.rollout }}<br>
+<strong>Namespace:</strong> {{ r.namespace }}<br>
+<strong>Gate run:</strong> {{ timestamp }}</p>
+
+<div class="decision decision-{{ r.decision | lower }}">{{ r.decision }}</div>
+<p><strong>Reason:</strong> {{ r.reason }}</p>
+
+<h2>Chaos experiments</h2>
+<table>
+  <tr><th>Experiment</th><th>Configured duration</th><th>Verdict</th></tr>
+  {% for e in r.experiments %}
+  <tr><td>{{ e.name }}</td><td>{{ e.duration }}s</td>
+      <td class="{{ 'pass' if e.verdict == 'Pass' else ('note' if e.verdict in ('Cancelled', 'Skipped') else 'fail') }}">{{ e.verdict }}</td></tr>
+  {% else %}
+  <tr><td colspan="3" class="note">No experiments ran.</td></tr>
+  {% endfor %}
+</table>
+
+<h2>SLO monitoring</h2>
+<table>
+  <tr><th>Service</th><th>Max burn rate seen</th><th>Threshold</th><th>Result</th></tr>
+  <tr><td>{{ r.slo_service }}</td><td>{{ '%.4f' % r.max_burn }}</td><td>{{ r.threshold }}</td>
+      <td class="{{ 'pass' if r.slo_ok else 'fail' }}">{{ 'PASS' if r.slo_ok else 'FAIL' }}</td></tr>
+</table>
+{% if r.slo_no_data %}<p class="note">No SLO data was observed for this service during the window; missing data is treated as 0.0, so this pass is not verified.</p>{% endif %}
+
+{% if grafana_url %}<p><a href="{{ grafana_url }}">Grafana dashboard</a></p>{% endif %}
+</body>
+</html>

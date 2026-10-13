@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: backend
+  namespace: default
+spec:
+  replicas: 3 # more than one replica, so pod-delete can pass on a healthy app
+  selector:
+    matchLabels:
+      app: backend # must match CHAOS_APP_LABEL
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: demo-backend:v1
+          imagePullPolicy: IfNotPresent # images are loaded into kind (scripts/preload-images.sh)
+          ports:
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 1
+            periodSeconds: 2
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 50m, memory: 32Mi}
+            limits: {memory: 128Mi}
+  strategy:
+    canary:
+      maxSurge: 0        # replace pods instead of adding extra ones: with 1 replica there is no redundancy
+      maxUnavailable: 1
+      steps:
+        - setWeight: 10 # step 0: initial canary traffic
+        - pause: {}     # step 1: chaos gate (CHAOS_GATE_STEP_INDEX=1); the orchestrator clears this
+        - setWeight: 50 # step 2
+        - setWeight: 100 # step 3

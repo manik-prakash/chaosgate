@@ -1,0 +1,23 @@
+# Reference only: the orchestrator generates the equivalent ChaosEngine at runtime
+# (name pattern chaos-gate-<experiment>-<unix-timestamp>).
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: chaos-gate-pod-delete-example
+  namespace: default
+spec:
+  engineState: active
+  annotationCheck: "false"
+  appinfo:
+    appns: default
+    applabel: app=backend
+    appkind: rollout
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - {name: TOTAL_CHAOS_DURATION, value: "60"}
+            - {name: CHAOS_INTERVAL, value: "20"}
+            - {name: FORCE, value: "false"}

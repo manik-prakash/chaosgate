@@ -1,0 +1,41 @@
+# Lean kube-prometheus-stack for a laptop kind cluster: Prometheus + Grafana only.
+fullnameOverride: kps
+alertmanager: {enabled: false}
+nodeExporter: {enabled: false}
+kubeStateMetrics: {enabled: false}
+defaultRules: {create: false}
+kubeApiServer: {enabled: false}
+kubelet: {enabled: false}
+kubeControllerManager: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeProxy: {enabled: false}
+kubeEtcd: {enabled: false}
+coreDns: {enabled: false}
+prometheus:
+  prometheusSpec:
+    # pick up every PodMonitor / PrometheusRule in the cluster, not only ones labelled for this release
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    scrapeInterval: 5s
+    retention: 6h
+    resources:
+      requests: {cpu: 100m, memory: 400Mi}
+      limits: {memory: 900Mi}
+grafana:
+  adminPassword: admin
+  defaultDashboardsEnabled: false
+  sidecar:
+    dashboards: {enabled: true, label: grafana_dashboard}
+  grafana.ini:
+    auth.anonymous: {enabled: true, org_role: Viewer}
+    security: {allow_embedding: true}
+  env:
+    GF_PLUGINS_PREINSTALL_DISABLED: "true"  # no internet plugin downloads at demo time
+  resources:
+    requests: {cpu: 50m, memory: 256Mi}
+    limits: {memory: 768Mi}
+prometheusOperator:
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 200Mi}
